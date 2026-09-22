@@ -26,6 +26,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "data"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "engine"))
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -41,6 +42,16 @@ app = FastAPI(
         "into a single ship/kill/hold recommendation."
     ),
     version="1.0.0",
+)
+
+# Allow the local frontend dashboard (opened as a file, or served from any
+# origin during development) to call this API. In a real production
+# deployment this would be locked down to a specific origin, not "*".
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
