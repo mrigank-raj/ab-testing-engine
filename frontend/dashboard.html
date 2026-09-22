@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experimentation Decision Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0E1420;
+    --panel: #161D2B;
+    --panel-raised: #1C2434;
+    --border: #2A3348;
+    --text: #E8ECF4;
+    --text-dim: #8993AA;
+    --accent: #5B8DEF;
+    --ship: #4ADE80;
+    --kill: #F87171;
+    --hold: #FBBF24;
+    --needs-data: #60A5FA;
+    --invalid: #C084FC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    line-height: 1.5;
+  }
+
+  header {
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    max-width: 640px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    padding: 28px 40px 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .group {
+    margin-bottom: 22px;
+  }
+
+  .group:last-of-type { margin-bottom: 0; }
+
+  .group-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .field {
+    margin-bottom: 12px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .field input, .field select {
+    width: 100%;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.88rem;
+  }
+
+  .field input:focus, .field select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  button#run {
+    width: 100%;
+    margin-top: 6px;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #0E1420;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  button#run:hover { filter: brightness(1.08); }
+  button#run:disabled { opacity: 0.6; cursor: default; }
+
+  /* --- Results panel --- */
+
+  .results {
+    display: flex;
+    flex-direction: column;
+    min-height: 420px;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--text-dim);
+    max-width: 320px;
+  }
+
+  .empty-state .glyph {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 2rem;
+    color: var(--border);
+    margin-bottom: 12px;
+  }
+
+  .result-content {
+    opacity: 0;
+    animation: reveal 0.35s ease forwards;
+  }
+
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .verdict-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .verdict-word {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 2.4rem;
+    letter-spacing: -0.01em;
+  }
+
+  .verdict-word.SHIP { color: var(--ship); }
+  .verdict-word.KILL { color: var(--kill); }
+  .verdict-word.HOLD { color: var(--hold); }
+  .verdict-word.NEEDS_MORE_DATA { color: var(--needs-data); }
+  .verdict-word.INVALID_SRM { color: var(--invalid); }
+
+  .metrics-row {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .metric {
+    min-width: 110px;
+  }
+
+  .metric .label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+  }
+
+  .metric .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .reasoning-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .reasoning-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .reasoning-list li {
+    padding: 12px 14px;
+    background: var(--panel-raised);
+    border-left: 2px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.88rem;
+    color: var(--text);
+  }
+
+  .status-badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 4px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  .badge.pass { color: var(--ship); border-color: var(--ship); }
+  .badge.fail { color: var(--kill); border-color: var(--kill); }
+
+  .error-box {
+    margin: auto;
+    color: var(--kill);
+    text-align: center;
+    font-size: 0.9rem;
+    max-width: 360px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Experimentation Decision Engine</h1>
+  <p>Set experiment parameters, run the pipeline (SRM check → sequential test → CUPED adjustment), and get a ship / kill / hold verdict.</p>
+</header>
+
+<div class="layout">
+
+  <div class="panel">
+    <div class="group">
+      <div class="group-label">Experiment setup</div>
+      <div class="field">
+        <label for="n_users">Total users</label>
+        <input type="number" id="n_users" value="50000" step="1000">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="control_rate">Baseline rate</label>
+          <input type="number" id="control_rate" value="0.10" step="0.01">
+        </div>
+        <div class="field">
+          <label for="true_lift">True lift</label>
+          <input type="number" id="true_lift" value="0.02" step="0.01">
+        </div>
+      </div>
+      <div class="field">
+        <label for="n_days">Duration (days)</label>
+        <input type="number" id="n_days" value="14" step="1">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Bug injection (optional)</div>
+      <div class="field">
+        <label for="biased_platform">Platform with SRM bug</label>
+        <select id="biased_platform">
+          <option value="">None</option>
+          <option value="iOS">iOS</option>
+          <option value="Android">Android</option>
+          <option value="Web">Web</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="segment_bias">Bug strength</label>
+        <input type="number" id="segment_bias" value="0" step="0.01">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-label">Test settings</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="alpha">Alpha</label>
+          <input type="number" id="alpha" value="0.05" step="0.01">
+        </div>
+        <div class="field">
+          <label for="seed">Seed</label>
+          <input type="number" id="seed" value="42" step="1">
+        </div>
+      </div>
+    </div>
+
+    <button id="run">Run experiment</button>
+  </div>
+
+  <div class="panel results" id="results">
+    <div class="empty-state" id="empty-state">
+      <div class="glyph">&gt;_</div>
+      <div>Set your parameters and run an experiment to see the decision engine's verdict.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_URL = "http://127.0.0.1:8000/simulate-and-analyze";
+
+const runBtn = document.getElementById("run");
+const resultsPanel = document.getElementById("results");
+
+runBtn.addEventListener("click", async () => {
+  runBtn.disabled = true;
+  runBtn.textContent = "Running…";
+  resultsPanel.innerHTML = `<div class="empty-state"><div class="glyph">&gt;_</div><div>Running the pipeline…</div></div>`;
+
+  const payload = {
+    n_users: parseInt(document.getElementById("n_users").value),
+    true_control_rate: parseFloat(document.getElementById("control_rate").value),
+    true_lift: parseFloat(document.getElementById("true_lift").value),
+    n_days: parseInt(document.getElementById("n_days").value),
+    biased_platform: document.getElementById("biased_platform").value || null,
+    segment_bias_strength: parseFloat(document.getElementById("segment_bias").value),
+    alpha: parseFloat(document.getElementById("alpha").value),
+    seed: parseInt(document.getElementById("seed").value),
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server responded with ${res.status}`);
+    }
+
+    const data = await res.json();
+    renderResult(data);
+  } catch (err) {
+    resultsPanel.innerHTML = `
+      <div class="error-box">
+        Couldn't reach the API. Make sure the server is running:<br><br>
+        <code>uvicorn app:app --reload --port 8000</code><br><br>
+        (${err.message})
+      </div>`;
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = "Run experiment";
+  }
+});
+
+function renderResult(data) {
+  const effectPct = data.effect_estimate !== null
+    ? (data.effect_estimate * 100).toFixed(2) + "%"
+    : "—";
+  const pValue = data.p_value !== null ? data.p_value.toFixed(5) : "—";
+
+  const reasoningItems = data.reasoning.map(r => `<li>${r}</li>`).join("");
+
+  resultsPanel.innerHTML = `
+    <div class="result-content">
+      <div class="verdict-row">
+        <div class="verdict-word ${data.verdict}">${data.verdict.replace(/_/g, " ")}</div>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <div class="label">Effect estimate</div>
+          <div class="value">${effectPct}</div>
+        </div>
+        <div class="metric">
+          <div class="label">p-value</div>
+          <div class="value">${pValue}</div>
+        </div>
+      </div>
+      <div class="reasoning-label">Reasoning</div>
+      <ul class="reasoning-list">${reasoningItems}</ul>
+      <div class="status-badges">
+        <span class="badge ${data.srm_check_passed ? 'pass' : 'fail'}">SRM ${data.srm_check_passed ? 'PASSED' : 'FAILED'}</span>
+        <span class="badge ${data.sequential_safe_to_stop ? 'pass' : ''}">SEQUENTIAL ${data.sequential_safe_to_stop ? 'SAFE TO STOP' : 'IN PROGRESS'}</span>
+      </div>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
