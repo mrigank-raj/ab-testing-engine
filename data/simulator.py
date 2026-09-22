@@ -33,6 +33,10 @@ class SimulationConfig:
     covariate_correlation: float = 0.6  # correlation between pre-experiment activity and outcome
                                          # (needed later for CUPED to have something to work with)
     n_days: int = 14                 # experiment duration, needed for sequential testing simulation
+    biased_platform: str | None = None  # e.g. "iOS" - if set, ONLY this platform gets extra SRM bias
+                                         # (simulates a realistic bug: e.g. an iOS redirect failing
+                                         # for some users before they're logged into the treatment arm)
+    segment_bias_strength: float = 0.0  # extra split skew applied only to biased_platform
     seed: int | None = None
 
 
@@ -49,16 +53,27 @@ def simulate_experiment(config: SimulationConfig) -> pd.DataFrame:
     rng = np.random.default_rng(config.seed)
     n = config.n_users
 
+    # --- Platform dimension (used for SRM root-cause segmentation in Step 4) ---
+    platforms = rng.choice(["iOS", "Android", "Web"], size=n, p=[0.35, 0.35, 0.30])
+
     # --- Assignment, with optional injected SRM ---
     # SRM = the actual split ratio deviates from the intended split due to a
     # bug (bot filtering, logging drop, redirect failure, etc.)
-    effective_split = config.traffic_split + config.srm_bias
-    effective_split = np.clip(effective_split, 0.01, 0.99)
-    group = rng.choice(
-        ["control", "treatment"],
-        size=n,
-        p=[1 - effective_split, effective_split],
-    )
+    # Two kinds of bias supported:
+    #   1. Global bias (srm_bias) - affects the whole population equally
+    #   2. Segment-specific bias (biased_platform + segment_bias_strength) -
+    #      simulates a bug that ONLY affects one platform, which is the
+    #      realistic case root-cause diagnostics are meant to catch.
+    group = np.empty(n, dtype=object)
+    for platform in ["iOS", "Android", "Web"]:
+        mask = platforms == platform
+        extra_bias = config.segment_bias_strength if platform == config.biased_platform else 0.0
+        effective_split = np.clip(config.traffic_split + config.srm_bias + extra_bias, 0.01, 0.99)
+        group[mask] = rng.choice(
+            ["control", "treatment"],
+            size=mask.sum(),
+            p=[1 - effective_split, effective_split],
+        )
 
     # --- Pre-experiment covariate (e.g. prior 30-day activity/spend) ---
     # Deliberately correlated with the outcome so CUPED has a real signal
@@ -93,6 +108,7 @@ def simulate_experiment(config: SimulationConfig) -> pd.DataFrame:
     df = pd.DataFrame({
         "user_id": np.arange(n),
         "day_assigned": day_assigned,
+        "platform": platforms,
         "group": group,
         "pre_experiment_activity": pre_activity,
         "converted": converted,
