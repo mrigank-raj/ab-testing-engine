@@ -1,0 +1,14 @@
+numpy
+pandas
+scipy
+scikit-learn
+fastapi
+uvicorn
+pydantic
+datasets
+scikit-uplift
+jupyter
+nbconvert
+ipykernel
+matplotlib
+nbformat
