@@ -27,7 +27,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "engine"))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -80,7 +81,7 @@ class DecisionResponse(BaseModel):
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RedirectResponse(url="/docs")
+    return FileResponse(os.path.join(os.path.dirname(__file__), "..", "frontend", "dashboard.html"))
 
 
 @app.get("/health")
