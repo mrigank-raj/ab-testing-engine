@@ -1,0 +1,9 @@
+-r requirements.txt
+scikit-learn
+datasets
+scikit-uplift
+jupyter
+nbconvert
+ipykernel
+matplotlib
+nbform
